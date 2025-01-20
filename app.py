@@ -7,22 +7,27 @@ from ver_equipos import ver_equipos
 
 st.set_page_config(
     page_title="Balonmano Corazonistas - Horarios y Resultados",
-    page_icon="🗓️",
+    page_icon="🤾‍♂️",
     layout="wide",
 )
 
-# Título de la aplicación
-st.title("Balonmano Corazonistas - Horarios y Resultados")
 
+
+# Título de la aplicación
 st.image("header.png", width=400)
+st.title("🗓️ Horarios y Resultados")
+
 
 # Cargar el panel desde el archivo Excel
 try:
     panel = Panel.from_excel("equipos.xlsx")
-    st.success("Archivo de equipos cargado exitosamente.")
+    # st.success("Archivo de equipos cargado exitosamente.")
 except FileNotFoundError:
     st.error("El archivo 'equipos.xlsx' no se encuentra. Por favor, asegúrate de que está en el directorio correcto.")
     st.stop()
+
+
+
 
 
 # Crear pestañas
@@ -32,7 +37,7 @@ tabs = st.tabs(["Resultados y Horarios", "Modificar Archivos de Equipos"])
 with tabs[0]:
 
     # Entrada de fechas en dos columnas
-    st.header("Seleccione el rango de fechas")
+    st.subheader("Búsqueda de partidos:")
     col1, col2 = st.columns(2)
     with col1:
         start_date = st.date_input("Fecha de inicio", value=datetime.now().date())
@@ -46,8 +51,8 @@ with tabs[0]:
         st.stop()
 
     # Mostrar resultados en toda la página
-
     st.markdown("---")  # Línea divisoria para separar secciones
+
     col1, col2 = st.columns([1, 1], gap="large")
 
     with col1:
