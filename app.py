@@ -6,8 +6,8 @@ from ver_equipos import ver_equipos
 
 
 st.set_page_config(
-    page_title="Balonamno Corazonistas - Horarios y Resultados",
-    page_icon=":bar_chart:",
+    page_title="Balonmano Corazonistas - Horarios y Resultados",
+    page_icon="🗓️",
     layout="wide",
 )
 
