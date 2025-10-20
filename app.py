@@ -1,9 +1,6 @@
 import streamlit as st
-from datetime import datetime
-from tools import Panel  # Asegúrate de que tools.py está en el mismo directorio o en el path correcto
-from ver_equipos import ver_equipos
-
-
+from nuevo2526 import get_partidos_from_url
+import pandas as pd
 
 st.set_page_config(
     page_title="Balonmano Corazonistas - Horarios y Resultados",
@@ -11,76 +8,80 @@ st.set_page_config(
     layout="wide",
 )
 
-
-
-# Título de la aplicación
+# --- ENCABEZADO ---
 st.image("header.png", width=400)
 st.title("🗓️ Horarios y Resultados")
 
+# --- CARGA DE DATOS ---
+df_equipos = pd.read_csv("equipos.csv")
 
-# Cargar el panel desde el archivo Excel
-try:
-    panel = Panel.from_excel("equipos.xlsx")
-    # st.success("Archivo de equipos cargado exitosamente.")
-except FileNotFoundError:
-    st.error("El archivo 'equipos.xlsx' no se encuentra. Por favor, asegúrate de que está en el directorio correcto.")
-    st.stop()
+# --- FILTRO DE FECHAS ---
+col1, col2 = st.columns(2)
+with col1:
+    start_date = st.date_input("📅 Fecha de inicio", format="DD/MM/YYYY")
+with col2:
+    end_date = st.date_input("📆 Fecha de fin", format="DD/MM/YYYY")
 
+st.divider()
 
-
-
-
-# Crear pestañas
-tabs = st.tabs(["Resultados y Horarios", "Modificar Archivos de Equipos"])
-
-
-with tabs[0]:
-
-    # Entrada de fechas en dos columnas
-    st.subheader("Búsqueda de partidos:")
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("Fecha de inicio", value=datetime.now().date())
-        solo_locales = st.checkbox("Mostrar solo los partidos en el cole", value=False)
-    with col2:
-        end_date = st.date_input("Fecha de final", value=datetime.now().date())
-
-    # Validar rango de fechas
-    if start_date > end_date:
-        st.warning("La fecha de inicio debe ser anterior o igual a la fecha de final.")
-        st.stop()
-
-    # Mostrar resultados en toda la página
-    st.markdown("---")  # Línea divisoria para separar secciones
-
-    col1, col2 = st.columns([1, 1], gap="large")
-
-    with col1:
-        ver_horarios = st.button("Ver Horarios", use_container_width=True)
-    with col2:
-        ver_resultados = st.button("Ver Resultados", use_container_width=True)
-
-    if ver_horarios:
-        try:
-            horarios_df = panel.get_partidos_df(start_date, end_date, solo_locales)
-            longitud = len(horarios_df)
-            altura = longitud * 40 if longitud > 0 else 100
-            st.subheader("Horarios de los partidos")
-            st.dataframe(horarios_df, use_container_width=True, height=altura)  # Altura dinámica
-        except Exception as e:
-            st.error(f"Ocurrió un error al obtener los horarios: {e}")
+# --- FUNCIONES AUXILIARES ---
+def filter_partidos_by_date(partidos, start_date, end_date):
+    filtered_partidos = []
+    for partido in partidos:
+        fecha_str = partido["fecha"]  # formato "DD/MM/YYYY"
+        fecha = pd.to_datetime(fecha_str, format="%d/%m/%Y", errors="coerce")
+        if pd.isna(fecha):
+            continue
+        if start_date and fecha < pd.to_datetime(start_date):
+            continue
+        if end_date and fecha > pd.to_datetime(end_date):
+            continue
+        filtered_partidos.append(partido)
+    return filtered_partidos
 
 
-    if ver_resultados:
-        try:
-            resultados_df = panel.get_resultados_df(start_date, end_date)
-            longitud = len(resultados_df)
-            altura = longitud * 40 if longitud > 0 else 100
-            st.subheader("Resultados de los partidos")
-            st.dataframe(resultados_df, use_container_width=True, height=altura)  # Altura dinámica
-        except Exception as e:
-            st.error(f"Ocurrió un error al obtener los resultados: {e}")
-    
+# --- BOTONES ---
+col1, col2 = st.columns(2)
+ver_horarios = col1.button("📅 Ver Horarios")
+ver_resultados = col2.button("🏆 Ver Resultados")
 
-with tabs[1]:
-    ver_equipos(panel=panel)
+# --- LÓGICA PRINCIPAL ---
+df_final = pd.DataFrame()
+
+if ver_horarios or ver_resultados:
+    for _, row in df_equipos.iterrows():
+        equipo_url = row[0]  # URL
+        apodo = row[1]       # Nombre corto
+        df_partidos = get_partidos_from_url(equipo_url, apodo)
+        df_filtrado = filter_partidos_by_date(df_partidos, start_date, end_date)
+        df_equipo = pd.DataFrame(df_filtrado)
+        df_final = pd.concat([df_final, df_equipo], ignore_index=True)
+
+    if not df_final.empty:
+        if ver_horarios:
+            df_final = df_final.sort_values(by=["fecha", "hora"])
+            df_final = df_final[["fecha", "hora", "local", "visitante", "lugar"]]
+            df_final.rename(columns={
+                "fecha": "📅 Fecha",
+                "hora": "🕒 Hora",
+                "local": "🏠 Equipo Local",
+                "visitante": "🚩 Equipo Visitante",
+                "lugar": "📍 Lugar del Partido"
+            }, inplace=True)
+            st.subheader("📅 Horarios de Partidos")
+
+        elif ver_resultados:
+            df_final = df_final[["local", "goles_local", "goles_visitante", "visitante", "lugar"]]
+            df_final.rename(columns={
+                "local": "🏠 Equipo Local",
+                "goles_local": "🔵 Goles Local",
+                "goles_visitante": "🔴 Goles Visitante",
+                "visitante": "🚩 Equipo Visitante",
+                "lugar": "📍 Lugar del Partido"
+            }, inplace=True)
+            st.subheader("🏆 Resultados de Partidos")
+
+        # 📊 Mostrar la tabla a ancho completo
+        st.dataframe(df_final, use_container_width=True)
+    else:
+        st.warning("⚠️ No se encontraron partidos para el rango de fechas seleccionado.")
