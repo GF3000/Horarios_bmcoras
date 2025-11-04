@@ -59,8 +59,19 @@ if ver_horarios or ver_resultados:
 
     if not df_final.empty:
         if ver_horarios:
-            df_final = df_final.sort_values(by=["fecha", "hora"])
+            # Convierte la hora (string) a un tipo de tiempo real
+            df_final["hora_orden"] = pd.to_datetime(df_final["hora"], format="%H:%M").dt.time
+
+            # Ordena por fecha y hora real
+            df_final = df_final.sort_values(by=["fecha", "hora_orden"])
+
+            # Elimina la columna auxiliar
+            df_final = df_final.drop(columns=["hora_orden"])
+
+            # Reordena columnas
             df_final = df_final[["fecha", "hora", "local", "visitante", "lugar"]]
+
+            # Renombra columnas con emojis
             df_final.rename(columns={
                 "fecha": "📅 Fecha",
                 "hora": "🕒 Hora",
@@ -68,7 +79,9 @@ if ver_horarios or ver_resultados:
                 "visitante": "🚩 Equipo Visitante",
                 "lugar": "📍 Lugar del Partido"
             }, inplace=True)
+
             st.subheader("📅 Horarios de Partidos")
+            st.dataframe(df_final)
 
         elif ver_resultados:
             df_final = df_final[["local", "goles_local", "goles_visitante", "visitante", "lugar"]]
@@ -82,6 +95,6 @@ if ver_horarios or ver_resultados:
             st.subheader("🏆 Resultados de Partidos")
 
         # 📊 Mostrar la tabla a ancho completo
-        st.dataframe(df_final, use_container_width=True)
+        st.dataframe(df_final, use_container_width=True, height = 800)
     else:
         st.warning("⚠️ No se encontraron partidos para el rango de fechas seleccionado.")
