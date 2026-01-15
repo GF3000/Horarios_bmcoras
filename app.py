@@ -1,6 +1,7 @@
 import streamlit as st
 from nuevo2526 import get_partidos_from_url
 import pandas as pd
+import concurrent.futures
 
 st.set_page_config(
     page_title="Balonmano Corazonistas - Horarios y Resultados",
@@ -39,6 +40,17 @@ def filter_partidos_by_date(partidos, start_date, end_date):
         filtered_partidos.append(partido)
     return filtered_partidos
 
+def fetch_and_filter(row, start_date, end_date):
+    try:
+        equipo_url = row[0]  # URL
+        apodo = row[1]       # Nombre corto
+        partidos = get_partidos_from_url(equipo_url, apodo)
+        filtrados = filter_partidos_by_date(partidos, start_date, end_date)
+        return pd.DataFrame(filtrados)
+    except Exception as e:
+        st.warning(f"Error fetching data for {row[1]}: {e}")
+        return pd.DataFrame()
+
 
 # --- BOTONES ---
 col1, col2 = st.columns(2)
@@ -49,13 +61,11 @@ ver_resultados = col2.button("🏆 Ver Resultados")
 df_final = pd.DataFrame()
 
 if ver_horarios or ver_resultados:
-    for _, row in df_equipos.iterrows():
-        equipo_url = row[0]  # URL
-        apodo = row[1]       # Nombre corto
-        df_partidos = get_partidos_from_url(equipo_url, apodo)
-        df_filtrado = filter_partidos_by_date(df_partidos, start_date, end_date)
-        df_equipo = pd.DataFrame(df_filtrado)
-        df_final = pd.concat([df_final, df_equipo], ignore_index=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(fetch_and_filter, row, start_date, end_date) for _, row in df_equipos.iterrows()]
+        for future in concurrent.futures.as_completed(futures):
+            df_equipo = future.result()
+            df_final = pd.concat([df_final, df_equipo], ignore_index=True)
 
     if not df_final.empty:
         if ver_horarios:
@@ -81,7 +91,6 @@ if ver_horarios or ver_resultados:
             }, inplace=True)
 
             st.subheader("📅 Horarios de Partidos")
-            st.dataframe(df_final)
 
         elif ver_resultados:
             df_final = df_final[["local", "goles_local", "goles_visitante", "visitante", "lugar"]]

@@ -91,7 +91,6 @@ def get_partidos_from_url(url, apodo = None):
     partidos = [get_partido(tr) for tr in trs]
     if apodo:
         nombre = get_nombre_equipo(soup)
-        # replace nombre with apodo
         for partido in partidos:
             if partido["local"] == nombre:
                 partido["local"] = apodo
