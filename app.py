@@ -15,6 +15,7 @@ st.title("🗓️ Horarios y Resultados")
 
 # --- CARGA DE DATOS ---
 df_equipos = pd.read_csv("equipos.csv")
+teams = df_equipos['apodo'].tolist()
 
 # --- FILTRO DE FECHAS ---
 col1, col2 = st.columns(2)
@@ -40,7 +41,7 @@ def filter_partidos_by_date(partidos, start_date, end_date):
         filtered_partidos.append(partido)
     return filtered_partidos
 
-def fetch_and_filter(row, start_date, end_date):
+def fetch_and_filter(row, start_date, end_date): #Esta función sustituye al anterior contenido del for
     try:
         equipo_url = row[0]  # URL
         apodo = row[1]       # Nombre corto
@@ -50,6 +51,16 @@ def fetch_and_filter(row, start_date, end_date):
     except Exception as e:
         st.warning(f"Error fetching data for {row[1]}: {e}")
         return pd.DataFrame()
+
+def highlight_team(row):
+    styles = [''] * len(row)
+    if row['🏠 Equipo Local'] in teams:
+        idx = row.index.get_loc('🏠 Equipo Local')
+        styles[idx] = 'background-color: yellow'
+    if row['🚩 Equipo Visitante'] in teams:
+        idx = row.index.get_loc('🚩 Equipo Visitante')
+        styles[idx] = 'background-color: yellow'
+    return styles
 
 
 # --- BOTONES ---
@@ -104,6 +115,7 @@ if ver_horarios or ver_resultados:
             st.subheader("🏆 Resultados de Partidos")
 
         # 📊 Mostrar la tabla a ancho completo
-        st.dataframe(df_final, use_container_width=True, height = 800)
+        styled_df = df_final.style.apply(highlight_team, axis=1)
+        st.dataframe(styled_df, use_container_width=True, height = 800)
     else:
         st.warning("⚠️ No se encontraron partidos para el rango de fechas seleccionado.")
