@@ -11,8 +11,15 @@ def find_tr(soup):
     trs = soup.find_all('tr', class_='partido')
     return trs
 
+# La web devuelve 403 a clientes sin User-Agent de navegador (p. ej. python-requests)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+}
+
 def get_html(url):
-    response = requests.get(url)
+    response = requests.get(url, headers=HEADERS, timeout=30)
+    response.raise_for_status()
     return response.content
 
 def get_partido(tr_tag):
