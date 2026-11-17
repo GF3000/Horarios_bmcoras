@@ -1,7 +1,6 @@
 import streamlit as st
 from nuevo2526 import get_partidos_from_url
 import pandas as pd
-import concurrent.futures
 
 st.set_page_config(
     page_title="Balonmano Corazonistas - Horarios y Resultados",
@@ -49,8 +48,7 @@ def descargar_partidos(equipo_url, apodo):
     return get_partidos_from_url(equipo_url, apodo)
 
 def fetch_and_filter(row, start_date, end_date): #Esta función sustituye al anterior contenido del for
-    """Devuelve (DataFrame, error). No llama a st.* porque se ejecuta en un hilo
-    y Streamlit ignora lo que se muestra desde hilos secundarios."""
+    """Devuelve (DataFrame, error)."""
     apodo = row["apodo"]
     try:
         partidos = descargar_partidos(row["url"], apodo)
@@ -123,14 +121,17 @@ df_final = pd.DataFrame()
 
 if ver_horarios or ver_resultados:
     errores = []
-    with st.spinner("Descargando partidos..."):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(fetch_and_filter, row, start_date, end_date) for _, row in df_equipos.iterrows()]
-            for future in concurrent.futures.as_completed(futures):
-                df_equipo, error = future.result()
-                if error:
-                    errores.append(error)
-                df_final = pd.concat([df_final, df_equipo], ignore_index=True)
+    # De uno en uno: si se piden varios equipos a la vez la web responde 429
+    # "Too Many Requests". Si aun así nos frena, get_html espera y reintenta.
+    progreso = st.progress(0.0, text="Descargando partidos...")
+    total = len(df_equipos)
+    for i, (_, row) in enumerate(df_equipos.iterrows()):
+        progreso.progress(i / total, text=f"Descargando {row['apodo']} ({i + 1}/{total})...")
+        df_equipo, error = fetch_and_filter(row, start_date, end_date)
+        if error:
+            errores.append(error)
+        df_final = pd.concat([df_final, df_equipo], ignore_index=True)
+    progreso.empty()
 
     if errores:
         st.error(

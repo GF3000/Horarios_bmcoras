@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import requests
 import re
+import time
 
 
 url = "https://resultadosbalonmano.isquad.es/equipo.php?id_equipo=219271&id=1031586&id_superficie=1"
@@ -17,10 +18,32 @@ HEADERS = {
                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 }
 
+# Desde nov. 2026 la web manda a una versión BETA (/maqueta/) que carga los partidos
+# con JavaScript, así que el HTML llega sin ellos. Esta cookie es la que pone el botón
+# «Versión clásica» de la BETA y hace que se sirva la página de siempre.
+COOKIES = {"resultados_version": "clasica-sesion"}
+
+# La web limita las peticiones: deja pasar unas 15 seguidas y después responde
+# 429 "Too many requests" (o corta la conexión) durante unos segundos.
+# Si pasa, esperamos y reintentamos en vez de rendirnos a la primera.
+ESPERAS_REINTENTO = [5, 10, 20, 30]  # segundos
+
+class WebSaturadaError(Exception):
+    pass
+
 def get_html(url):
-    response = requests.get(url, headers=HEADERS, timeout=30)
-    response.raise_for_status()
-    return response.content
+    for espera in ESPERAS_REINTENTO + [None]:
+        try:
+            response = requests.get(url, headers=HEADERS, cookies=COOKIES, timeout=30)
+            if response.status_code != 429:
+                response.raise_for_status()
+                return response.content
+        except requests.ConnectionError:
+            pass  # la web corta la conexión cuando la saturamos
+        if espera is None:
+            break
+        time.sleep(espera)
+    raise WebSaturadaError("la web de la federación está limitando las descargas")
 
 def get_partido(tr_tag):
     """
